@@ -45,7 +45,8 @@ git push apolo HEAD:master
 # En APOLO
 cd ~/apps/github-sentinel
 ~/.bun/bin/bun install --frozen-lockfile
-install -m 600 .env.example .env   # rellena tokens y pon HOST=<IP-TAILSCALE>
+[ -f .env ] || install -m 600 .env.example .env
+# Edita .env (tokens y HOST=<IP-TAILSCALE>) ANTES de habilitar el servicio
 sudo install -m 644 scripts/linux/github-sentinel.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now github-sentinel
 ```

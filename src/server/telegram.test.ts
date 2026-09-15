@@ -1,5 +1,13 @@
 import { afterEach, expect, mock, test } from "bun:test";
-import { escapeHtml, fitTelegramLimit, sendTelegram } from "./telegram";
+import {
+  buildDigestMessages,
+  escapeHtml,
+  fitTelegramLimit,
+  sendTelegram,
+  telegramConfig,
+  type DigestItems,
+} from "./telegram";
+import type { IssueWithRepo } from "./db";
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -78,4 +86,84 @@ test("sendTelegram no filtra el token en errores de red", async () => {
   const err = (await sendTelegram("x").catch((e) => e)) as Error;
   expect(err).toBeInstanceOf(Error);
   expect(err.message).not.toContain("SECRET");
+});
+
+// F5: Bun suele dar name === "Error" en fallos de red; err.code (p.ej. ECONNREFUSED)
+// es lo único diagnosticable y nunca contiene el token.
+test("sendTelegram incluye err.code en el mensaje de red cuando existe", async () => {
+  process.env.TELEGRAM_BOT_TOKEN = "123:SECRET";
+  process.env.TELEGRAM_CHAT_ID = "42";
+  useFetch(async () => {
+    throw Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:443"), {
+      code: "ECONNREFUSED",
+    });
+  });
+
+  const err = (await sendTelegram("x").catch((e) => e)) as Error;
+  expect(err.message).toBe("Telegram: fallo de red (ECONNREFUSED)");
+});
+
+// F1: un emoji cortado en el límite deja un surrogate suelto; JSON.stringify lo manda
+// tal cual y Telegram responde 400 porque no es UTF-8 válido.
+test("sendTelegram normaliza surrogates sueltos antes de enviar", async () => {
+  process.env.TELEGRAM_BOT_TOKEN = "123:SECRET";
+  process.env.TELEGRAM_CHAT_ID = "42";
+  const fn = useFetch(async () => Response.json({ ok: true }));
+
+  await sendTelegram("a\ud83d");
+
+  const [, init] = fn.mock.calls[0]!;
+  const body = JSON.parse(init.body as string) as { text: string };
+  expect(body.text).toBe("a�");
+});
+
+// F3: DIGEST_TIMEZONE="" no debe colar un string vacío a Intl (rompería el digest programado).
+test("telegramConfig usa el timezone por defecto si DIGEST_TIMEZONE viene vacío", () => {
+  const prev = process.env.DIGEST_TIMEZONE;
+  process.env.DIGEST_TIMEZONE = "";
+  try {
+    expect(telegramConfig().timezone).toBe("America/Mexico_City");
+  } finally {
+    if (prev === undefined) delete process.env.DIGEST_TIMEZONE;
+    else process.env.DIGEST_TIMEZONE = prev;
+  }
+});
+
+// F2: el fallback (sin PRs, sin LLM) debe escapar título/resumen/url de issues externas.
+test("buildDigestMessages escapa HTML de issues externos en el fallback", async () => {
+  const issue = {
+    title: "<script>&",
+    analysis_summary: "a<b",
+    owner: "o",
+    repo_name: "r",
+    issue_number: 1,
+    created_at: new Date().toISOString(),
+    html_url: "https://x/?a=1&b=2",
+  } as unknown as IssueWithRepo;
+
+  const items: DigestItems = {
+    prs: [],
+    issues: [issue],
+    truncatedPRs: 0,
+    truncatedIssues: 0,
+    totals: {
+      repos: 0,
+      openIssues: 0,
+      analyzedIssues: 0,
+      openPRs: 0,
+      lastScan: null,
+    },
+  };
+
+  const messages = await buildDigestMessages(items, {
+    slot: "manual",
+    timezone: "America/Mexico_City",
+  });
+
+  expect(messages).toHaveLength(1);
+  const message = messages[0]!;
+  expect(message).not.toContain("<script");
+  expect(message).toContain("&lt;script&gt;&amp;");
+  expect(message).toContain("a&lt;b");
+  expect(message).toContain("?a=1&amp;b=2");
 });

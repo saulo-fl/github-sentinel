@@ -30,7 +30,7 @@ export function telegramConfig(): TelegramConfig {
     enabled,
     configured: Boolean(token && chatId),
     chatId: chatId ? maskId(chatId) : null,
-    timezone: process.env.DIGEST_TIMEZONE ?? "America/Mexico_City",
+    timezone: process.env.DIGEST_TIMEZONE?.trim() || "America/Mexico_City",
     cron: process.env.DIGEST_CRON?.trim() || "0 0,15 * * *",
   };
 }
@@ -68,7 +68,7 @@ export async function sendTelegram(text: string): Promise<void> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: chatId,
-        text: fitTelegramLimit(text),
+        text: fitTelegramLimit(text).toWellFormed(),
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
       }),
@@ -76,8 +76,13 @@ export async function sendTelegram(text: string): Promise<void> {
     });
   } catch (err) {
     // No se re-lanza el error original: su mensaje puede incluir la URL con el token.
+    // err.code (p.ej. ConnectionRefused/ECONNREFUSED) es más diagnosticable que name,
+    // que en Bun suele quedar en "Error", y nunca contiene el token.
+    const code = (err as { code?: unknown })?.code;
     const name = err instanceof Error ? err.name : "Error";
-    throw new Error(`Telegram: fallo de red (${name})`);
+    throw new Error(
+      `Telegram: fallo de red (${typeof code === "string" && code ? code : name})`
+    );
   }
 
   const data = (await res.json().catch(() => ({}))) as {
