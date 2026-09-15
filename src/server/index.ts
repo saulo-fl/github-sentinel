@@ -111,7 +111,7 @@ const server = serve({
             url: llmConfig.url,
             model: llmConfig.model,
           },
-          whatsapp: {
+          telegram: {
             ...digest.config,
             lastSent: digest.lastSent,
             nextRunAt: digest.nextRunAt,
@@ -136,7 +136,7 @@ const server = serve({
           const cfg = digestStatus().config;
           if (!cfg.configured) {
             return badRequest(
-              "WhatsApp no configurado. Define WHATSAPP_PHONE y CALLMEBOT_API_KEY."
+              "Telegram no configurado. Define TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID."
             );
           }
           const result = await runDigest({

@@ -75,13 +75,13 @@ con esta forma exacta:
   "proposal": "Propuesta de solución concreta en 3-5 frases, en español."
 }`;
 
-const PR_PRIORITY_SYSTEM_PROMPT = `Eres un agente de triage para un digest de WhatsApp.
+const PR_PRIORITY_SYSTEM_PROMPT = `Eres un agente de triage para un digest de Telegram.
 Vas muy a saco: directo, útil, sin relleno y optimizado para leer en móvil.
 Tu trabajo es elegir las 3 PRs externas más prioritarias ahora.
 Prioriza impacto, urgencia, riesgo, antigüedad, bloqueos probables y facilidad de revisión.
 Usa SOLO repo, título, descripción de la PR, autor, labels, comentarios y edad.
 No pidas ver archivos, no menciones diffs, no inventes datos y no listes PRs.
-Las PRs elegidas se enviarán juntas en un único WhatsApp: la razón debe ser la única frase del cuerpo de cada bloque.
+Las PRs elegidas se enviarán juntas en un único mensaje de Telegram: la razón debe ser la única frase del cuerpo de cada bloque.
 Máxima densidad: sin "por qué", sin "acción", sin etiquetas, sin introducciones.
 Devuelve UN SOLO JSON válido (sin texto extra, sin markdown, sin backticks) con esta forma exacta:
 

@@ -3,15 +3,15 @@ import { status as sentinelStatus } from "./sentinel";
 import {
   buildDigestMessages,
   collectDigestItems,
-  sendWhatsApp,
-  whatsappConfig,
+  sendTelegram,
+  telegramConfig,
   type DigestContext,
-} from "./whatsapp";
+} from "./telegram";
 
 const LAST_SENT_AT_KEY = "digest:last_sent_at";
-const WHATSAPP_SEND_INTERVAL_MS = positiveInt(
-  process.env.WHATSAPP_SEND_INTERVAL_MS,
-  5000
+const TELEGRAM_SEND_INTERVAL_MS = positiveInt(
+  process.env.TELEGRAM_SEND_INTERVAL_MS,
+  1000
 );
 
 type DigestRunResult = {
@@ -63,7 +63,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function runScheduledDigest(): Promise<void> {
-  const cfg = whatsappConfig();
+  const cfg = telegramConfig();
   if (!cfg.enabled || !cfg.configured) return;
 
   const slot = currentDigestSlot(cfg.timezone);
@@ -82,13 +82,13 @@ async function executeDigest(ctx: DigestContext): Promise<DigestRunResult> {
   const items = collectDigestItems(sentinelStatus().lastRun);
   const messages = await buildDigestMessages(items, ctx);
   for (const [index, message] of messages.entries()) {
-    if (index > 0 && WHATSAPP_SEND_INTERVAL_MS > 0) {
+    if (index > 0 && TELEGRAM_SEND_INTERVAL_MS > 0) {
       console.log(
-        `[digest] esperando ${WHATSAPP_SEND_INTERVAL_MS}ms antes del WhatsApp ${index + 1}/${messages.length}`
+        `[digest] esperando ${TELEGRAM_SEND_INTERVAL_MS}ms antes del Telegram ${index + 1}/${messages.length}`
       );
-      await sleep(WHATSAPP_SEND_INTERVAL_MS);
+      await sleep(TELEGRAM_SEND_INTERVAL_MS);
     }
-    await sendWhatsApp(message);
+    await sendTelegram(message);
   }
   if (messages.length > 0) {
     queries.setSetting.run(LAST_SENT_AT_KEY, new Date().toISOString());
@@ -137,15 +137,15 @@ export async function previewDigest(ctx: DigestContext): Promise<{
 
 export function startDigestScheduler(): void {
   if (digestJob) return;
-  const cfg = whatsappConfig();
+  const cfg = telegramConfig();
   if (!cfg.configured) {
     console.log(
-      "[digest] WhatsApp no configurado (faltan WHATSAPP_PHONE / CALLMEBOT_API_KEY). Scheduler en pausa."
+      "[digest] Telegram no configurado (faltan TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID). Scheduler en pausa."
     );
     return;
   }
   if (!cfg.enabled) {
-    console.log("[digest] WhatsApp desactivado por WHATSAPP_ENABLED=false.");
+    console.log("[digest] Telegram desactivado por TELEGRAM_ENABLED=false.");
     return;
   }
 
@@ -174,11 +174,11 @@ function nextDigestRun(cron: string): string | null {
 }
 
 export function digestStatus(): {
-  config: ReturnType<typeof whatsappConfig>;
+  config: ReturnType<typeof telegramConfig>;
   lastSent: string | null;
   nextRunAt: string | null;
 } {
-  const config = whatsappConfig();
+  const config = telegramConfig();
   const lastSent = queries.getSetting.get(LAST_SENT_AT_KEY)?.value ?? null;
   const nextRunAt =
     config.enabled && config.configured ? nextDigestRun(config.cron) : null;

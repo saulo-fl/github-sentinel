@@ -4,68 +4,90 @@ import {
   type PullRequestPriorityResult,
 } from "./llm";
 
-const CALLMEBOT_URL = "https://api.callmebot.com/whatsapp.php";
+const TELEGRAM_API = "https://api.telegram.org";
 
-const MAX_MESSAGE_LENGTH = 3500;
+// Telegram acepta 4096; el margen deja sitio al sufijo de truncado.
+const MAX_MESSAGE_LENGTH = 4000;
 const MAX_PRS_FOR_PRIORITY = 12;
 const MAX_PR_DESCRIPTION_CHARS = 500;
 const MAX_ISSUES_IN_DIGEST = 10;
 const PREVIEW_MESSAGE_SEPARATOR = "\n\n---\n\n";
 
-export type WhatsAppConfig = {
+export type TelegramConfig = {
   enabled: boolean;
   configured: boolean;
-  phone: string | null;
+  chatId: string | null;
   timezone: string;
   cron: string;
 };
 
-export function whatsappConfig(): WhatsAppConfig {
-  const phone = process.env.WHATSAPP_PHONE?.trim() || null;
-  const apikey = process.env.CALLMEBOT_API_KEY?.trim() || null;
-  const enabled = (process.env.WHATSAPP_ENABLED ?? "true").toLowerCase() !== "false";
+export function telegramConfig(): TelegramConfig {
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim() || null;
+  const chatId = process.env.TELEGRAM_CHAT_ID?.trim() || null;
+  const enabled =
+    (process.env.TELEGRAM_ENABLED ?? "true").toLowerCase() !== "false";
   return {
     enabled,
-    configured: Boolean(phone && apikey),
-    phone: phone ? maskPhone(phone) : null,
-    timezone: process.env.WHATSAPP_TIMEZONE ?? "Europe/Madrid",
-    cron: process.env.WHATSAPP_DIGEST_CRON?.trim() || "0 9,18 * * *",
+    configured: Boolean(token && chatId),
+    chatId: chatId ? maskId(chatId) : null,
+    timezone: process.env.DIGEST_TIMEZONE ?? "America/Mexico_City",
+    cron: process.env.DIGEST_CRON?.trim() || "0 0,15 * * *",
   };
 }
 
-function maskPhone(phone: string): string {
-  const clean = phone.replace(/\D/g, "");
+function maskId(id: string): string {
+  const clean = id.replace(/\D/g, "");
   if (clean.length <= 4) return clean;
   return `${clean.slice(0, 2)}…${clean.slice(-3)}`;
 }
 
-export async function sendWhatsApp(text: string): Promise<void> {
-  const phone = process.env.WHATSAPP_PHONE?.trim();
-  const apikey = process.env.CALLMEBOT_API_KEY?.trim();
-  if (!phone || !apikey) {
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Corta en el último salto de línea: cada <b>/<i> abre y cierra en su propia línea.
+export function fitTelegramLimit(text: string): string {
+  if (text.length <= MAX_MESSAGE_LENGTH) return text;
+  const cut = text.lastIndexOf("\n", MAX_MESSAGE_LENGTH);
+  return `${text.slice(0, cut > 0 ? cut : MAX_MESSAGE_LENGTH)}\n… (truncado)`;
+}
+
+export async function sendTelegram(text: string): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
+  if (!token || !chatId) {
     throw new Error(
-      "Faltan WHATSAPP_PHONE y/o CALLMEBOT_API_KEY en el entorno."
+      "Faltan TELEGRAM_BOT_TOKEN y/o TELEGRAM_CHAT_ID en el entorno."
     );
   }
 
-  const truncated =
-    text.length > MAX_MESSAGE_LENGTH
-      ? `${text.slice(0, MAX_MESSAGE_LENGTH - 20)}\n… (truncado)`
-      : text;
+  let res: Response;
+  try {
+    res = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: fitTelegramLimit(text),
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true },
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    // No se re-lanza el error original: su mensaje puede incluir la URL con el token.
+    const name = err instanceof Error ? err.name : "Error";
+    throw new Error(`Telegram: fallo de red (${name})`);
+  }
 
-  const url = new URL(CALLMEBOT_URL);
-  url.searchParams.set("phone", phone.replace(/\D/g, ""));
-  url.searchParams.set("text", truncated);
-  url.searchParams.set("apikey", apikey);
-
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    signal: AbortSignal.timeout(15_000),
-  });
-
-  const body = await res.text();
-  if (!res.ok || /APIKey is invalid|ERROR/i.test(body)) {
-    throw new Error(`CallMeBot ${res.status}: ${body.slice(0, 200)}`);
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    description?: string;
+  };
+  if (!res.ok || !data.ok) {
+    throw new Error(
+      `Telegram ${res.status}: ${data.description ?? "respuesta inválida"}`
+    );
   }
 }
 
@@ -110,7 +132,7 @@ export async function buildDigestMessages(
   items: DigestItems,
   ctx: DigestContext
 ): Promise<string[]> {
-  const time = new Date().toLocaleString("es-ES", {
+  const time = new Date().toLocaleString("es-MX", {
     timeZone: ctx.timezone,
     hour: "2-digit",
     minute: "2-digit",
@@ -147,36 +169,38 @@ function buildFallbackDigestMessage(
         ? "Buenas tardes"
         : "Resumen";
   const lines: string[] = [];
-  lines.push(`*GitHub Sentinel* · ${greeting}`);
-  lines.push(`_${time}_`);
+  lines.push(`<b>GitHub Sentinel</b> · ${greeting}`);
+  lines.push(`<i>${escapeHtml(time)}</i>`);
   lines.push("");
 
   if (items.prs.length === 0 && items.issues.length === 0) {
     lines.push("✅ Todo en orden, nada pendiente de revisar.");
     lines.push("");
     lines.push(
-      `_${items.totals.repos} repos · ${items.totals.openIssues} issues totales · ${items.totals.analyzedIssues} analizadas_`
+      `<i>${items.totals.repos} repos · ${items.totals.openIssues} issues totales · ${items.totals.analyzedIssues} analizadas</i>`
     );
     if (items.totals.lastScan) {
-      lines.push(`_último scan: ${relativeAge(items.totals.lastScan)}_`);
+      lines.push(`<i>último scan: ${relativeAge(items.totals.lastScan)}</i>`);
     }
     return lines.join("\n");
   }
 
   if (items.issues.length > 0) {
     lines.push(
-      `*Issues high-risk (${items.issues.length}${items.truncatedIssues ? `+${items.truncatedIssues}` : ""})*`
+      `<b>Issues high-risk (${items.issues.length}${items.truncatedIssues ? `+${items.truncatedIssues}` : ""})</b>`
     );
     for (const issue of items.issues) {
       const age = relativeAge(issue.created_at);
       lines.push(
-        `• ${issue.owner}/${issue.repo_name} #${issue.issue_number} · ${age}`
+        `• ${escapeHtml(`${issue.owner}/${issue.repo_name}`)} #${issue.issue_number} · ${age}`
       );
-      lines.push(`  ${truncate(issue.title, 90)}`);
+      lines.push(`  ${escapeHtml(truncate(cleanText(issue.title), 90))}`);
       if (issue.analysis_summary) {
-        lines.push(`  _${truncate(issue.analysis_summary, 120)}_`);
+        lines.push(
+          `  <i>${escapeHtml(truncate(cleanText(issue.analysis_summary), 120))}</i>`
+        );
       }
-      lines.push(`  ${issue.html_url}`);
+      lines.push(`  ${escapeHtml(issue.html_url)}`);
     }
     if (items.truncatedIssues > 0) {
       lines.push(`  …y ${items.truncatedIssues} más`);
@@ -208,10 +232,10 @@ function buildPullRequestMessages(
     const reason = item.reason || truncate(cleanText(pr.title), 110);
 
     const lines = [
-      `*${item.priority.toUpperCase()}* ${meta}`,
-      truncate(reason, 120),
+      `<b>${item.priority.toUpperCase()}</b> ${escapeHtml(meta)}`,
+      escapeHtml(truncate(cleanText(reason), 120)),
       "",
-      pr.html_url,
+      escapeHtml(pr.html_url),
     ];
 
     blocks.push(lines.join("\n"));
