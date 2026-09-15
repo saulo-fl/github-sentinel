@@ -17,6 +17,46 @@ Pensado para correr 24/7 en un MiniPC o servidor (Windows o macOS).
 
 ---
 
+## Esta variante: Telegram + APOLO
+
+Fork de [midudev/github-sentinel](https://github.com/midudev/github-sentinel) con dos cambios:
+el digest llega por un **bot de Telegram** (en vez de WhatsApp/CallMeBot) y corre como
+servicio **systemd** en APOLO (Ubuntu) con **Ollama** local (`qwen3:4b-instruct`).
+
+### Telegram
+
+1. Crea el bot con [@BotFather](https://t.me/BotFather) y pon su token en `TELEGRAM_BOT_TOKEN`.
+2. Mándale `/start` al bot.
+3. Llama a `getUpdates` del bot y copia `result[].message.chat.id` a `TELEGRAM_CHAT_ID`.
+
+`DIGEST_CRON` se interpreta en UTC (`Bun.cron`): `0 0,15 * * *` = 09:00 y 18:00 en Ciudad de México.
+
+### Despliegue en APOLO
+
+```bash
+# Una vez, en APOLO
+git init -b master ~/apps/github-sentinel
+git -C ~/apps/github-sentinel config receive.denyCurrentBranch updateInstead
+
+# Desde tu equipo
+git remote add apolo saulo@<IP-TAILSCALE>:apps/github-sentinel
+git push apolo HEAD:master
+
+# En APOLO
+cd ~/apps/github-sentinel
+~/.bun/bin/bun install --frozen-lockfile
+install -m 600 .env.example .env   # rellena tokens y pon HOST=<IP-TAILSCALE>
+sudo install -m 644 scripts/linux/github-sentinel.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now github-sentinel
+```
+
+- Actualizar: `git push apolo HEAD:master`; en APOLO `~/.bun/bin/bun install --frozen-lockfile && sudo systemctl restart github-sentinel`.
+- Logs: `journalctl -u github-sentinel -f`.
+- Dashboard: `http://<IP-TAILSCALE>:3741` (solo tailnet, sin autenticación).
+- Traer cambios de midudev: `git fetch upstream && git merge upstream/main`.
+
+---
+
 ## Stack
 
 - **Runtime**: [Bun](https://bun.com) (servidor + bundler + sqlite + .env loader)

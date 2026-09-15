@@ -1,0 +1,19 @@
+[Unit]
+Description=GitHub Sentinel (digest de PRs e issues a Telegram)
+Wants=network-online.target
+After=network-online.target tailscaled.service ollama.service
+
+[Service]
+Type=simple
+User=saulo
+WorkingDirectory=/home/saulo/apps/github-sentinel
+Environment=NODE_ENV=production
+ExecStart=/home/saulo/.bun/bin/bun src/server/index.ts
+# Si Tailscale aún no tiene la IP al arrancar, el bind falla y se reintenta.
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
