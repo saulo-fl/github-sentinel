@@ -93,7 +93,7 @@ export function NotifyPanel({ status, onChange }: Props) {
 
       {tg?.configured && (
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-px bg-[var(--color-ink-3)] border border-[var(--color-ink-3)]">
-          <DigestMetric label="cron" value={`${tg.cron} UTC`} />
+          <DigestMetric label="cron" value={`${tg.cron} (hora del sistema)`} />
           <DigestMetric
             label="próximo"
             value={formatCountdown(tg.nextRunAt, now)}

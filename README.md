@@ -29,7 +29,7 @@ servicio **systemd** en APOLO (Ubuntu) con **Ollama** local (`qwen3-vl:4b-instru
 2. Mándale `/start` al bot.
 3. Llama a `getUpdates` del bot y copia `result[].message.chat.id` a `TELEGRAM_CHAT_ID`.
 
-`DIGEST_CRON` se interpreta en UTC (`Bun.cron`): `0 0,15 * * *` = 09:00 y 18:00 en Ciudad de México.
+`DIGEST_CRON` usa la zona horaria del sistema (`Bun.cron`, no UTC): en APOLO (`America/Mexico_City`) `0 9,18 * * *` = 09:00 y 18:00. Compruébalo con `timedatectl`.
 
 ### Despliegue en APOLO
 

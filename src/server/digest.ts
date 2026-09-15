@@ -152,7 +152,7 @@ export function startDigestScheduler(): void {
   try {
     digestJob = Bun.cron(cfg.cron, runScheduledDigest);
     console.log(
-      `[digest] activo · cron="${cfg.cron}" UTC · formato ${cfg.timezone}`
+      `[digest] activo · cron="${cfg.cron}" (hora del sistema) · formato ${cfg.timezone}`
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

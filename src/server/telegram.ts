@@ -31,7 +31,7 @@ export function telegramConfig(): TelegramConfig {
     configured: Boolean(token && chatId),
     chatId: chatId ? maskId(chatId) : null,
     timezone: process.env.DIGEST_TIMEZONE?.trim() || "America/Mexico_City",
-    cron: process.env.DIGEST_CRON?.trim() || "0 0,15 * * *",
+    cron: process.env.DIGEST_CRON?.trim() || "0 9,18 * * *",
   };
 }
 
