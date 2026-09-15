@@ -21,7 +21,7 @@ Pensado para correr 24/7 en un MiniPC o servidor (Windows o macOS).
 
 Fork de [midudev/github-sentinel](https://github.com/midudev/github-sentinel) con dos cambios:
 el digest llega por un **bot de Telegram** (en vez de WhatsApp/CallMeBot) y corre como
-servicio **systemd** en APOLO (Ubuntu) con **Ollama** local (`qwen3:4b-instruct`).
+servicio **systemd** en APOLO (Ubuntu) con **Ollama** local (`qwen3-vl:4b-instruct`).
 
 ### Telegram
 
