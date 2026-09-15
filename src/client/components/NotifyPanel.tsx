@@ -17,7 +17,7 @@ export function NotifyPanel({ status, onChange }: Props) {
     text: string;
   } | null>(null);
 
-  const wa = status?.whatsapp;
+  const tg = status?.telegram;
 
   useEffect(() => {
     setPreview(null);
@@ -69,39 +69,39 @@ export function NotifyPanel({ status, onChange }: Props) {
       <div className="flex items-center gap-3 flex-wrap">
         <span
           className={`w-1.5 h-1.5 rounded-full ${
-            wa?.configured
+            tg?.configured
               ? "bg-[var(--color-accent)]"
               : "bg-[var(--color-warn)]"
           }`}
         />
         <span className="font-pixel uppercase text-xs text-[var(--color-fg-1)] tracking-wider">
-          whatsapp digest
+          telegram digest
         </span>
         <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-fg-4)]">
-          {wa?.configured
-            ? `${wa.phone} · ${wa.timezone}`
+          {tg?.configured
+            ? `chat ${tg.chatId} · ${tg.timezone}`
             : "no configurado"}
         </span>
       </div>
 
-      {!wa?.configured && (
+      {!tg?.configured && (
         <p className="mt-3 text-xs text-[var(--color-fg-3)] font-mono">
-          define <code>WHATSAPP_PHONE</code> y <code>CALLMEBOT_API_KEY</code>{" "}
+          define <code>TELEGRAM_BOT_TOKEN</code> y <code>TELEGRAM_CHAT_ID</code>{" "}
           en el <code>.env</code> y reinicia para activar los envíos.
         </p>
       )}
 
-      {wa?.configured && (
+      {tg?.configured && (
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-px bg-[var(--color-ink-3)] border border-[var(--color-ink-3)]">
-          <DigestMetric label="cron" value={`${wa.cron} UTC`} />
+          <DigestMetric label="cron" value={`${tg.cron} UTC`} />
           <DigestMetric
             label="próximo"
-            value={formatCountdown(wa.nextRunAt, now)}
+            value={formatCountdown(tg.nextRunAt, now)}
             highlight
           />
           <DigestMetric
             label="último envío"
-            value={formatRelative(wa.lastSent)}
+            value={formatRelative(tg.lastSent)}
           />
         </div>
       )}
@@ -116,7 +116,7 @@ export function NotifyPanel({ status, onChange }: Props) {
         </button>
         <button
           onClick={send}
-          disabled={sending || !wa?.configured}
+          disabled={sending || !tg?.configured}
           className="font-pixel uppercase text-[10px] px-3 py-1.5 border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-[var(--color-ink-0)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {sending ? "sending..." : "force send now"}

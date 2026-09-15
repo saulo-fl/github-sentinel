@@ -49,10 +49,10 @@ export type Status = {
   analyzed: number;
   openPRs: number;
   llm: { available: boolean; url: string; model: string };
-  whatsapp: {
+  telegram: {
     enabled: boolean;
     configured: boolean;
-    phone: string | null;
+    chatId: string | null;
     timezone: string;
     cron: string;
     lastSent: string | null;
