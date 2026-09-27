@@ -225,25 +225,34 @@ function buildPullRequestMessages(
   focus: PullRequestPriorityResult
 ): string[] {
   const byId = new Map(prs.map((pr) => [prKey(pr), pr]));
+  const used = new Set<string>();
   const blocks: string[] = [];
 
-  for (const item of focus.focus) {
-    const pr = byId.get(item.id);
-    if (!pr) continue;
-
+  const emit = (pr: PullRequestWithRepo, priority: string, reason: string) => {
+    const key = prKey(pr);
+    if (used.has(key)) return;
+    used.add(key);
     const meta = `${pr.owner}/${pr.repo_name}#${pr.pr_number} · ${relativeAge(
       pr.created_at
     )}`;
-    const reason = item.reason || truncate(cleanText(pr.title), 110);
-
     const lines = [
-      `<b>${item.priority.toUpperCase()}</b> ${escapeHtml(meta)}`,
+      `<b>${priority.toUpperCase()}</b> ${escapeHtml(meta)}`,
       escapeHtml(truncate(cleanText(reason), 120)),
       "",
       escapeHtml(pr.html_url),
     ];
-
     blocks.push(lines.join("\n"));
+  };
+
+  for (const item of focus.focus) {
+    const pr = byId.get(item.id);
+    if (!pr) continue;
+    emit(pr, item.priority, item.reason || truncate(cleanText(pr.title), 110));
+  }
+
+  // ponytail: el LLM a veces devuelve ids que no matchean → no perder PRs, listar los que falten.
+  for (const pr of prs) {
+    emit(pr, "medium", truncate(cleanText(pr.title), 110));
   }
 
   return blocks.length > 0 ? [blocks.join("\n\n")] : [];

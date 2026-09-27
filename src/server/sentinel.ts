@@ -8,15 +8,12 @@ import {
 } from "./github";
 import { analyzeIssue, isLLMAvailable } from "./llm";
 
-function isExternalAuthor(
-  author: GitHubPullRequest["user"],
-  repoOwner: string
-): boolean {
+// Reportamos todo PR de un humano (dueño o colaborador); solo excluimos bots.
+// La columna is_external ahora significa "PR humano reportable".
+function isReportableAuthor(author: GitHubPullRequest["user"]): boolean {
   if (!author?.login) return false;
   if (author.type === "Bot") return false;
   if (/\[bot\]$/i.test(author.login)) return false;
-  const login = author.login.toLowerCase();
-  if (login === repoOwner.toLowerCase()) return false;
   return true;
 }
 
@@ -91,7 +88,7 @@ async function checkRepo(repo: RepoRow): Promise<CheckResult> {
       openPRs = prs.length;
       const seenPrNumbers: number[] = [];
       for (const pr of prs) {
-        const external = isExternalAuthor(pr.user, repo.owner);
+        const external = isReportableAuthor(pr.user);
         if (external && !pr.draft) externalPRs++;
         const labels = pr.labels.map(labelName);
         queries.upsertPullRequest.run(
