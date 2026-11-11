@@ -134,12 +134,16 @@ export function parseUserInput(input: string): string {
 export async function getOpenIssues(
   owner: string,
   name: string,
-  perPage = 30
-): Promise<GitHubIssue[]> {
+  perPage = 100
+): Promise<{ issues: GitHubIssue[]; complete: boolean }> {
   const all = await gh<GitHubIssue[]>(
     `/repos/${owner}/${name}/issues?state=open&sort=created&direction=desc&per_page=${perPage}`
   );
-  return all.filter((issue) => !issue.pull_request);
+  // complete = GitHub devolvió todas las abiertas (no hay más páginas).
+  return {
+    issues: all.filter((issue) => !issue.pull_request),
+    complete: all.length < perPage,
+  };
 }
 
 export function getOpenPullRequests(

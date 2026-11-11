@@ -55,12 +55,15 @@ async function checkRepo(repo: RepoRow): Promise<CheckResult> {
       repo.id
     );
 
-    const issues = await getOpenIssues(repo.owner, repo.name);
+    const { issues, complete } = await getOpenIssues(repo.owner, repo.name);
     let newCount = 0;
 
     for (const issue of issues) {
       const exists = queries.hasIssue.get(repo.id, issue.number);
-      if (exists) continue;
+      if (exists) {
+        queries.reopenIssue.run(repo.id, issue.number);
+        continue;
+      }
 
       const labels = issue.labels.map(labelName);
       queries.insertIssue.run(
@@ -79,6 +82,14 @@ async function checkRepo(repo: RepoRow): Promise<CheckResult> {
         now
       );
       newCount++;
+    }
+
+    // Lo que ya no está abierto en GitHub se marca cerrado (solo si la lista vino completa).
+    if (complete) {
+      queries.closeMissingIssues.run(
+        repo.id,
+        JSON.stringify(issues.map((i) => i.number))
+      );
     }
 
     let openPRs = 0;

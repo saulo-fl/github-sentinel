@@ -209,7 +209,14 @@ export const queries = {
      WHERE id = ?`
   ),
   countIssues: db.query<{ total: number }, []>(
-    "SELECT COUNT(*) as total FROM issues"
+    "SELECT COUNT(*) as total FROM issues WHERE state = 'open'"
+  ),
+  closeMissingIssues: db.prepare(
+    `UPDATE issues SET state = 'closed'
+     WHERE repo_id = ? AND state = 'open' AND issue_number NOT IN (SELECT value FROM json_each(?))`
+  ),
+  reopenIssue: db.prepare(
+    "UPDATE issues SET state = 'open' WHERE repo_id = ? AND issue_number = ? AND state != 'open'"
   ),
   countAnalyzed: db.query<{ total: number }, []>(
     "SELECT COUNT(*) as total FROM issues WHERE analyzed_at IS NOT NULL"
